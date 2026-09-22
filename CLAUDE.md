@@ -24,27 +24,40 @@ re-litigating metaphysics instead of writing code -- that is exactly what
 happened in an earlier attempt (with a different AI) that produced 600+
 lines of doctrine and zero working code.
 
-## Actual status: Slice 0 is done and runs
+## Actual status: Slice 1 (reproduction) implemented and runs
 
 ```
 cd src && python -m genaris.main
 # or: uv run python -m genaris.main
 ```
 
-15 agents, tiny heritable genome (metabolism/speed/max_energy), a 30x30
-grid with grass/food regrowth, hunger-driven foraging, aging, death by
-starvation or old age (~70 simulated years). No dependencies beyond the
-standard library. Confirmed working: a 60-simulated-day run completes
-with the population stable (food is currently abundant enough that no one
-starves -- that's an acceptable, honest first result, not a bug to force
-drama into).
+15 founders, tiny heritable genome (metabolism/speed/max_energy), two
+sexes, a 30x30 grid with grass/food regrowth, hunger-driven foraging,
+mate-seeking, sexual reproduction via `Genome.inherit`, aging, death by
+starvation or old age. No dependencies beyond the standard library.
+
+**Timescale:** life stages use the `DEV_COMPRESSED` profile in `agent.py`
+(adult at 15 days, fertile until 50, lifespan 70, 3-day birth cooldown).
+This is a deliberate dev compression so generations turn over in a
+runnable session -- not the world's real biology. Tick is still 1 minute.
+
+Reproduction rules: opposite-sex, both fertile, both >= 60 energy (a fixed
+bar -- a bar relative to max_energy selected for *smaller* reserves), off
+cooldown, adjacent. Each parent pays 25 energy; the child starts with
+that 50 (energy conserved). No gestation, no parental care, no mate
+choice yet -- intentionally.
+
+Observed (200-day runs, 8 seeds, ~50s each): population grows from 15 to
+a food-limited plateau (roughly 50-155 depending on seed; never extinct,
+never unbounded), reaches generation 12-13, starvation is the main death
+cause. Across all 8 seeds mean metabolism falls (~1.0 -> 0.81-0.91) and
+mean speed and max_energy rise -- consistent selection, not scripted.
 
 Code layout:
 - `src/genaris/genome.py` -- heritable traits, inheritance + mutation
-  (inheritance is implemented but not yet called anywhere -- reproduction
-  is Slice 1, see below)
 - `src/genaris/world.py` -- grid, terrain, food regrowth
-- `src/genaris/agent.py` -- one inhabitant's needs/behavior/death
+- `src/genaris/agent.py` -- one inhabitant's needs/behavior/reproduction/death,
+  plus the `LifeHistory` profile
 - `src/genaris/simulation.py` -- tick loop + event log
 - `src/genaris/main.py` -- entry point / demo runner
 
@@ -54,8 +67,7 @@ Each slice should run stably (no crashes, no nonsense state) before the
 next one starts:
 
 - **Slice 0 (done):** agents survive -- hunger, foraging, aging, death.
-- **Slice 1:** reproduction + real genetic inheritance (the `Genome.inherit`
-  method already exists for this).
+- **Slice 1 (implemented):** reproduction + real genetic inheritance.
 - **Slice 2:** a minimal magic-energy field -- just the accounting (regional
   generation, storage, leakage per doctrine Sections 3/5/6). No techniques,
   no resonance yet.

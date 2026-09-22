@@ -1,21 +1,21 @@
 """
-Slice 0 entry point: build a tiny world and population, run it for a
-while, print a summary periodically and every death event. This is meant
+Entry point: build a tiny world and founding population, run it for a
+while, print a periodic summary and every birth/death event. This is meant
 to be run and watched, not just read.
 """
 from __future__ import annotations
 
 import random
 
-from genaris.agent import Agent
+from genaris.agent import TICKS_PER_DAY, Agent, Sex
 from genaris.genome import Genome
 from genaris.simulation import Simulation
 from genaris.world import World
 
 WORLD_SIZE = 30
 NUM_AGENTS = 15
-TICKS = 60 * 24 * 60  # ~60 simulated days
-SUMMARY_EVERY = 24 * 60  # once per simulated day
+DAYS = 200  # several generations under the dev-compressed life history
+SUMMARY_EVERY_DAYS = 5
 SEED = 20260922
 
 
@@ -28,23 +28,31 @@ def build_simulation(seed: int = SEED) -> Simulation:
         x = rng.randrange(WORLD_SIZE)
         y = rng.randrange(WORLD_SIZE)
         genome = Genome.random_founder(rng)
-        agents.append(Agent(genome=genome, x=x, y=y))
+        sex = rng.choice([Sex.FEMALE, Sex.MALE])
+        # founders start as young adults of staggered ages, so they don't all
+        # hit old age on the same tick (initialization, per Section 37)
+        life = Agent.LIFE
+        age = rng.randrange(life.maturity_ticks, life.maturity_ticks + 15 * TICKS_PER_DAY)
+        agents.append(Agent(genome=genome, sex=sex, x=x, y=y, age_ticks=age))
 
     return Simulation(world, agents, rng)
 
 
 def main() -> None:
     sim = build_simulation()
-    print(f"Starting Genaris Slice 0: {NUM_AGENTS} agents on a {WORLD_SIZE}x{WORLD_SIZE} world.")
+    print(
+        f"Starting Genaris Slice 1: {NUM_AGENTS} founders on a {WORLD_SIZE}x{WORLD_SIZE} world "
+        f"(life history: {Agent.LIFE.label})."
+    )
     print(sim.summary())
 
     last_event_count = 0
-    for day in range(1, TICKS // SUMMARY_EVERY + 1):
-        sim.run(SUMMARY_EVERY)
+    for day in range(SUMMARY_EVERY_DAYS, DAYS + 1, SUMMARY_EVERY_DAYS):
+        sim.run(SUMMARY_EVERY_DAYS * TICKS_PER_DAY)
 
-        # print any death events that happened this day
+        # print any birth/death events since the last summary
         for event in sim.events[last_event_count:]:
-            print(f"  [day {day}] {event.text}")
+            print(f"  [day {event.tick / TICKS_PER_DAY:.1f}] {event.text}")
         last_event_count = len(sim.events)
 
         print(sim.summary())
