@@ -1,0 +1,99 @@
+# Project Genaris — notes for Claude Code
+
+## What this project is
+
+A living fantasy-world simulation built around emergence, not scripted
+storytelling: define rules, agents, and pressures, then let history
+happen. Long-term goal (stated by the person building this): "a real
+living world with sentient beings," humanoid, visually detailed
+eventually.
+
+## Read this first
+
+`docs/GENARIS_Consolidated_World_Laws_and_Simulation_Doctrine_V0.md` is
+the canonical world-law reference -- 40 sections covering magic, souls,
+genetics, cognition, culture, history, etc. `docs/Project_Genaris_Concept_Brief.md`
+is the earlier, more readable concept brief.
+
+**Do not try to implement these documents wholesale, and do not reopen
+their open questions.** They are reference law for a fully mature version
+of this world, years away. Treat them the way a novel's "world bible"
+relates to its first chapter: consistent with it, but nowhere near
+covering everything in it yet. The single biggest risk to this project is
+re-litigating metaphysics instead of writing code -- that is exactly what
+happened in an earlier attempt (with a different AI) that produced 600+
+lines of doctrine and zero working code.
+
+## Actual status: Slice 0 is done and runs
+
+```
+cd src && python -m genaris.main
+# or: uv run python -m genaris.main
+```
+
+15 agents, tiny heritable genome (metabolism/speed/max_energy), a 30x30
+grid with grass/food regrowth, hunger-driven foraging, aging, death by
+starvation or old age (~70 simulated years). No dependencies beyond the
+standard library. Confirmed working: a 60-simulated-day run completes
+with the population stable (food is currently abundant enough that no one
+starves -- that's an acceptable, honest first result, not a bug to force
+drama into).
+
+Code layout:
+- `src/genaris/genome.py` -- heritable traits, inheritance + mutation
+  (inheritance is implemented but not yet called anywhere -- reproduction
+  is Slice 1, see below)
+- `src/genaris/world.py` -- grid, terrain, food regrowth
+- `src/genaris/agent.py` -- one inhabitant's needs/behavior/death
+- `src/genaris/simulation.py` -- tick loop + event log
+- `src/genaris/main.py` -- entry point / demo runner
+
+## The phased roadmap (do not skip ahead)
+
+Each slice should run stably (no crashes, no nonsense state) before the
+next one starts:
+
+- **Slice 0 (done):** agents survive -- hunger, foraging, aging, death.
+- **Slice 1:** reproduction + real genetic inheritance (the `Genome.inherit`
+  method already exists for this).
+- **Slice 2:** a minimal magic-energy field -- just the accounting (regional
+  generation, storage, leakage per doctrine Sections 3/5/6). No techniques,
+  no resonance yet.
+- **Slice 3:** memory & beliefs (doctrine Sections 18/19) -- agents start
+  remembering things and can be wrong.
+- **Slice 4:** simple signaling -> early language (Section 20).
+- Later, in rough order: settlements/culture, the historical archive
+  (Section 26), a real visualization, magic techniques/resonance (Sections
+  4/8/9), the observer/godlike interface (Section 39).
+
+Ask before starting a slice out of order. A genuinely new design question
+that contradicts the doctrine is worth raising; wanting to "just quickly
+add" something from a later slice while an earlier one isn't solid is not.
+
+## Graphics / engine -- deliberately not started
+
+The person wants eventually-detailed 3D humanoid visuals (Unreal Engine +
+MetaHuman is the planned target, discussed and agreed, not yet built).
+This must stay decoupled: the simulation is a standalone Python program
+producing state (agent positions/ages/etc.), rendering is a separate
+concern that reads that state. Do not introduce Unreal, any game engine,
+or any graphics library as a dependency of `genaris/` itself.
+
+Sequencing agreed with the person:
+1. Headless Python (Slices 0-2ish) -- no graphics at all. **This is where
+   the project currently is.**
+2. A crude debug visualization (e.g. pygame or a simple grid print) once
+   agents do something worth watching -- fast iteration, not final art.
+3. Unreal + MetaHuman -- only once behavior is stable enough to know what
+   needs animating/rendering. Species: humanoid, no specific design locked
+   in yet, so a flexible base is fine.
+
+Do not jump to step 2 or 3 just because it's asked for in the moment --
+check with the person if a request seems to be skipping ahead, per the
+"working unattended" judgment call, but default to headless-first.
+
+## Dev environment
+
+Windows machine. Python managed via `uv`. VS Code with Python/Pylance/
+Ruff/Jupyter. Git for Windows + GitHub Desktop available. No game engine
+installed or needed yet.
