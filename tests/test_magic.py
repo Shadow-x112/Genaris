@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from genaris.magic import MagicAccountingError, MagicConfig, MagicField  # noqa: E402
-from genaris.world import World  # noqa: E402
+from genaris.world import Terrain, World  # noqa: E402
 
 
 def make_field(config: MagicConfig | None = None, seed: int = 7) -> MagicField:
@@ -35,12 +35,14 @@ class LedgerTests(unittest.TestCase):
         self.assertAlmostEqual(f.total_free() + f.total_bound(), f.generated, delta=1e-6 * f.generated)
 
     def test_bound_never_exceeds_capacity(self) -> None:
-        f = make_field(MagicConfig(absorption_rate=0.1))  # fast absorption to force saturation
+        # tiny stores and fast absorption to force saturation
+        cfg = MagicConfig(absorption_rate=0.1, capacity={Terrain.GRASS: 5.0, Terrain.EMPTY: 1.0})
+        f = make_field(cfg)
         for tick in range(1, 20_000):
             f.tick(tick)
-        for y in range(f.height):
-            for x in range(f.width):
-                self.assertLessEqual(f.bound[y][x], f.capacity[y][x] * (1 + 1e-9))
+        fills = [f.bound[y][x] / f.capacity[y][x] for y in range(f.height) for x in range(f.width)]
+        self.assertGreater(max(fills), 0.99)  # saturation was actually reached
+        self.assertLessEqual(max(fills), 1 + 1e-9)
 
     def test_generation_continues_when_abundant(self) -> None:
         f = make_field()
@@ -53,7 +55,7 @@ class LedgerTests(unittest.TestCase):
 
     def test_closed_edges_lose_nothing(self) -> None:
         # no generation; put energy in one corner and let it spread
-        cfg = MagicConfig(baseline_rate=0.0, hotspot_count=0)
+        cfg = MagicConfig(baseline_rate=0.0, hotspot_count=0, diffusion_rate=0.005)
         f = make_field(cfg)
         f.free[0][0] = 1000.0
         f.initial_total = 1000.0

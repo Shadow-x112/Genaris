@@ -68,10 +68,14 @@ for this slice, not a bug. Strain (Section 6) is deferred: there is no
 magical activity to cause it. Magic uses its own seeded stream
 (`"magic:{seed}"`), so agent outcomes per seed are unchanged by it.
 
-Observed (200 days): terrain stores reach ~93% of capacity by day 25 and
-~99% by day 50; after that essentially all new energy stays free. The
-richest-to-poorest cell ratio falls from ~7x (day 25) to ~1.2x (day
-200) -- diffusion outpaces hotspot contrast at current placeholder rates.
+Tuning (current `MagicConfig` placeholders): slow diffusion (0.0002) and
+large terrain stores (grass 500 / empty 150) so regions stay distinct and
+stores fill over months. Observed at day 200 (2 seeds): stores ~66% full,
+richest/poorest free-energy ratio ~27-31x. The first tuning (diffusion
+0.005, stores 50/15) saturated stores by day 25 and flattened the map to
+~1.2x. Note: with no sinks, both effects are only delayed, never
+prevented -- free energy rises forever, so stores eventually fill and the
+*ratio* between regions drifts toward 1 (the absolute gap stabilizes).
 
 Code layout:
 - `src/genaris/genome.py` -- heritable traits, inheritance + mutation

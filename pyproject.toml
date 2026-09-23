@@ -1,7 +1,7 @@
 [project]
 name = "genaris"
 version = "0.1.0"
-description = "Project Genaris - a living fantasy-world simulation (Slice 0: minimal agent survival loop)"
+description = "Project Genaris - a living fantasy-world simulation"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []

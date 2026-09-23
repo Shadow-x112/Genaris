@@ -36,11 +36,15 @@ class MagicConfig:
     hotspot_count: int = 3
     hotspot_peak_rate: float = 0.01  # extra generation per minute at a hotspot's center
     hotspot_sigma: float = 4.0  # hotspot falloff width, in cells
-    diffusion_rate: float = 0.005  # fraction of a concentration difference moved per minute per neighbor
-    absorption_rate: float = 0.001  # fraction of free energy absorbed per minute into an empty store
+    # slow enough that regions stay distinct over hundreds of days; at 0.005
+    # the whole 30x30 map evened out to ~1.2x richest/poorest by day 200
+    diffusion_rate: float = 0.0002  # fraction of a concentration difference moved per minute per neighbor
+    absorption_rate: float = 0.0002  # fraction of free energy absorbed per minute into an empty store
     leakage_rate: float = 0.0001  # fraction of bound energy leaked back to the field per minute
     capacity: dict[Terrain, float] = field(
-        default_factory=lambda: {Terrain.GRASS: 50.0, Terrain.EMPTY: 15.0}
+        # large enough that stores fill over months rather than weeks; with no
+        # sinks, free energy rises forever, so any finite store saturates eventually
+        default_factory=lambda: {Terrain.GRASS: 500.0, Terrain.EMPTY: 150.0}
     )
     tolerance: float = 1e-9  # relative ledger tolerance for floating-point rounding
 
