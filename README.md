@@ -23,7 +23,7 @@ python -m genaris.main
 ```
 
 This runs 15 founding agents on a 30x30 grid for 200 simulated days
-(about a minute and a half). Every 5 days it prints a population summary
+(about five minutes). Every 5 days it prints a population summary
 (sexes, births, generations, average heritable traits) and a magic-field
 ledger line, plus every birth and death since the last summary.
 
@@ -41,11 +41,12 @@ python -m unittest discover -s tests
 
 - `src/genaris/genome.py` -- heritable traits + inheritance/mutation
 - `src/genaris/world.py` -- the grid, terrain, food regrowth
+- `src/genaris/foraging.py` -- how agents value a food spot (amount vs. distance)
 - `src/genaris/magic.py` -- magical-energy field, terrain storage, ledger
 - `src/genaris/agent.py` -- a single inhabitant's needs/behavior/reproduction/death
 - `src/genaris/simulation.py` -- the tick loop and event log
 - `src/genaris/main.py` -- entry point / demo runner
-- `tests/` -- magic ledger tests
+- `tests/` -- magic ledger and foraging tests
 - `docs/` -- the full world-law doctrine and concept brief (reference
   material for later slices, not a checklist to implement all at once)
 

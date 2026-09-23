@@ -50,11 +50,22 @@ cooldown, adjacent. Each parent pays 25 energy; the child starts with
 that 50 (energy conserved). No gestation, no parental care, no mate
 choice yet -- intentionally.
 
-Observed (200-day runs, 8 seeds, ~50s each): population grows from 15 to
-a food-limited plateau (roughly 50-155 depending on seed; never extinct,
-never unbounded), reaches generation 12-13, starvation is the main death
-cause. Across all 8 seeds mean metabolism falls (~1.0 -> 0.81-0.91) and
-mean speed and max_energy rise -- consistent selection, not scripted.
+**Foraging:** a hungry agent picks the visible food cell (including its
+own) with the best `food_score(amount, distance)` in `foraging.py` --
+amount / (1 + distance), no minimum cutoff, so crumbs are still eaten when
+nothing better is in range. Until this fix (found via the Slice 3
+ablation) agents walked to the *nearest* cell with any food and spent
+ticks on tiny bites, which capped every Slice 0-2 population number at
+roughly a third of what the food supply supports.
+
+Observed with fixed foraging (200-day runs, 8 seeds, ~5 min each):
+population plateaus at roughly 290-450 depending on seed (was 50-155
+before the fix); never extinct, never unbounded. Generation 12-13;
+starvation is still the main death cause. Across all 8 seeds mean
+metabolism falls (~1.0 -> 0.89-0.93) and mean speed rises (+0.01 to
++0.07). Mean max_energy rises in 6 seeds, is flat in 1, and dips slightly
+in 1 -- a weaker signal than before the fix, plausibly because efficient
+foraging makes large reserves matter less.
 
 **Magic (Slice 2), `magic.py`:** free energy per grid cell, generated at
 fixed regional rates (baseline + 3 seeded hotspots), spreading between
@@ -80,6 +91,8 @@ prevented -- free energy rises forever, so stores eventually fill and the
 Code layout:
 - `src/genaris/genome.py` -- heritable traits, inheritance + mutation
 - `src/genaris/world.py` -- grid, terrain, food regrowth
+- `src/genaris/foraging.py` -- `food_score`, the one rule for valuing a food spot
+- `tests/test_foraging.py` -- food-choice tests
 - `src/genaris/magic.py` -- magic field, terrain storage, ledger
 - `tests/test_magic.py` -- ledger/pathway tests
 - `src/genaris/agent.py` -- one inhabitant's needs/behavior/reproduction/death,

@@ -11,6 +11,7 @@ import random
 from dataclasses import dataclass, field
 from enum import Enum
 
+from genaris.foraging import food_score
 from genaris.genome import Genome
 from genaris.world import World
 
@@ -120,21 +121,26 @@ class Agent:
 
         moved = False
         if is_hungry:
-            if cell.terrain.name == "GRASS" and cell.food > 0.5:
-                # eat: convert local food into energy
-                bite = min(cell.food, 3.0)
-                cell.food -= bite
-                self.energy = min(self.max_energy, self.energy + bite * 4.0)
-            else:
-                # seek nearest known food
-                candidates = world.nearby_food_cells(self.x, self.y, self.EAT_RADIUS)
-                if candidates:
-                    tx, ty, _food = candidates[0]
+            # weigh every visible food cell (including this one) by amount
+            # against distance, rather than taking the nearest crumb
+            candidates = world.nearby_food_cells(self.x, self.y, self.EAT_RADIUS)
+            if candidates:
+                # candidates are nearest-first, so max() breaks ties toward nearer
+                tx, ty, _food = max(
+                    candidates,
+                    key=lambda c: food_score(c[2], max(abs(c[0] - self.x), abs(c[1] - self.y))),
+                )
+                if (tx, ty) == (self.x, self.y):
+                    # eat: convert local food into energy
+                    bite = min(cell.food, 3.0)
+                    cell.food -= bite
+                    self.energy = min(self.max_energy, self.energy + bite * 4.0)
+                else:
                     self._step_toward(tx, ty, world)
                     moved = True
-                else:
-                    self._wander(world, rng)
-                    moved = True
+            else:
+                self._wander(world, rng)
+                moved = True
         else:
             mate = self._nearest_mate(occupancy) if occupancy and self.can_reproduce() else None
             if mate is not None:
