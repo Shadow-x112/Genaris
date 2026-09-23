@@ -9,6 +9,7 @@ import random
 
 from genaris.agent import TICKS_PER_DAY, Agent, Sex
 from genaris.genome import Genome
+from genaris.magic import MagicField
 from genaris.simulation import Simulation
 from genaris.world import World
 
@@ -35,13 +36,16 @@ def build_simulation(seed: int = SEED) -> Simulation:
         age = rng.randrange(life.maturity_ticks, life.maturity_ticks + 15 * TICKS_PER_DAY)
         agents.append(Agent(genome=genome, sex=sex, x=x, y=y, age_ticks=age))
 
-    return Simulation(world, agents, rng)
+    # separate seeded stream for the magic field (doctrine Section 25), so
+    # adding it does not change the world or agents a given seed produces
+    magic = MagicField(world, random.Random(f"magic:{seed}"))
+    return Simulation(world, agents, rng, magic)
 
 
 def main() -> None:
     sim = build_simulation()
     print(
-        f"Starting Genaris Slice 1: {NUM_AGENTS} founders on a {WORLD_SIZE}x{WORLD_SIZE} world "
+        f"Starting Genaris Slice 2: {NUM_AGENTS} founders on a {WORLD_SIZE}x{WORLD_SIZE} world "
         f"(life history: {Agent.LIFE.label})."
     )
     print(sim.summary())

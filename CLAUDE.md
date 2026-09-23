@@ -24,11 +24,14 @@ re-litigating metaphysics instead of writing code -- that is exactly what
 happened in an earlier attempt (with a different AI) that produced 600+
 lines of doctrine and zero working code.
 
-## Actual status: Slice 1 (reproduction) implemented and runs
+## Actual status: Slices 1 (reproduction) and 2 (magic accounting) implemented and run
 
 ```
 cd src && python -m genaris.main
 # or: uv run python -m genaris.main
+
+# tests (from repo root; stdlib unittest, no dependencies)
+python -m unittest discover -s tests
 ```
 
 15 founders, tiny heritable genome (metabolism/speed/max_energy), two
@@ -53,9 +56,28 @@ never unbounded), reaches generation 12-13, starvation is the main death
 cause. Across all 8 seeds mean metabolism falls (~1.0 -> 0.81-0.91) and
 mean speed and max_energy rise -- consistent selection, not scripted.
 
+**Magic (Slice 2), `magic.py`:** free energy per grid cell, generated at
+fixed regional rates (baseline + 3 seeded hotspots), spreading between
+neighbors (closed world edges), absorbed into terrain matter up to a
+per-terrain capacity and leaking back. Terrain-only storage -- agents do
+not hold or sense magic, and it has no effect on anything yet. The field
+starts at zero. A ledger enforces `free + bound == initial + generated`
+after every update and raises `MagicAccountingError` rather than clamping.
+No sinks exist, so the total grows linearly forever -- doctrine-correct
+for this slice, not a bug. Strain (Section 6) is deferred: there is no
+magical activity to cause it. Magic uses its own seeded stream
+(`"magic:{seed}"`), so agent outcomes per seed are unchanged by it.
+
+Observed (200 days): terrain stores reach ~93% of capacity by day 25 and
+~99% by day 50; after that essentially all new energy stays free. The
+richest-to-poorest cell ratio falls from ~7x (day 25) to ~1.2x (day
+200) -- diffusion outpaces hotspot contrast at current placeholder rates.
+
 Code layout:
 - `src/genaris/genome.py` -- heritable traits, inheritance + mutation
 - `src/genaris/world.py` -- grid, terrain, food regrowth
+- `src/genaris/magic.py` -- magic field, terrain storage, ledger
+- `tests/test_magic.py` -- ledger/pathway tests
 - `src/genaris/agent.py` -- one inhabitant's needs/behavior/reproduction/death,
   plus the `LifeHistory` profile
 - `src/genaris/simulation.py` -- tick loop + event log
@@ -68,7 +90,7 @@ next one starts:
 
 - **Slice 0 (done):** agents survive -- hunger, foraging, aging, death.
 - **Slice 1 (implemented):** reproduction + real genetic inheritance.
-- **Slice 2:** a minimal magic-energy field -- just the accounting (regional
+- **Slice 2 (implemented):** a minimal magic-energy field -- just the accounting (regional
   generation, storage, leakage per doctrine Sections 3/5/6). No techniques,
   no resonance yet.
 - **Slice 3:** memory & beliefs (doctrine Sections 18/19) -- agents start

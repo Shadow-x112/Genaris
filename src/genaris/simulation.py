@@ -12,6 +12,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from genaris.agent import Agent, Sex
+from genaris.magic import MagicField
 from genaris.world import World
 
 
@@ -22,8 +23,15 @@ class Event:
 
 
 class Simulation:
-    def __init__(self, world: World, agents: list[Agent], rng: random.Random):
+    def __init__(
+        self,
+        world: World,
+        agents: list[Agent],
+        rng: random.Random,
+        magic: MagicField | None = None,
+    ):
         self.world = world
+        self.magic = magic
         self.agents = agents
         self.rng = rng
         self.tick_count = 0
@@ -43,6 +51,8 @@ class Simulation:
     def step(self) -> None:
         self.tick_count += 1
         self.world.tick()
+        if self.magic is not None:
+            self.magic.tick(self.tick_count)
         occupancy = self._occupancy()
         for agent in self.agents:
             if not agent.alive:
@@ -116,4 +126,5 @@ class Simulation:
             f"births {self.births}, max gen {max_gen}, "
             f"avg energy {avg_energy:.1f}, avg age {avg_age:.1f}d | "
             f"traits met {met:.3f} spd {spd:.3f} maxE {mxe:.3f}"
+            + (f"\n    {self.magic.summary()}" if self.magic is not None else "")
         )
