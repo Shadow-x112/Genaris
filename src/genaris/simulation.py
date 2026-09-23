@@ -37,6 +37,10 @@ class Simulation:
         self.tick_count = 0
         self.events: list[Event] = []
         self.births = 0
+        # memory-trip stats carried over from agents who have died
+        self._dead_trips = 0
+        self._dead_trip_hits = 0
+        self._dead_trip_confidence = 0.0
 
     def log(self, text: str) -> None:
         self.events.append(Event(self.tick_count, text))
@@ -66,6 +70,11 @@ class Simulation:
                 )
         self._pair_and_birth()
         # drop the dead so the per-tick loops don't grow with history
+        for a in self.agents:
+            if not a.alive:
+                self._dead_trips += a.trips
+                self._dead_trip_hits += a.trip_hits
+                self._dead_trip_confidence += a.trip_confidence_sum
         self.agents = [a for a in self.agents if a.alive]
 
     def _pair_and_birth(self) -> None:
@@ -109,6 +118,27 @@ class Simulation:
     def living_agents(self) -> list[Agent]:
         return [a for a in self.agents if a.alive]
 
+    def trip_totals(self) -> tuple[int, int, float]:
+        """(trips, trips where food was really there, summed confidence),
+        over everyone who has lived in this run."""
+        trips = self._dead_trips + sum(a.trips for a in self.agents)
+        hits = self._dead_trip_hits + sum(a.trip_hits for a in self.agents)
+        conf = self._dead_trip_confidence + sum(a.trip_confidence_sum for a in self.agents)
+        return trips, hits, conf
+
+    def memory_summary(self) -> str:
+        if not Agent.MEMORY_ENABLED:
+            return "memory: off"
+        living = self.living_agents()
+        avg_beliefs = sum(len(a.memory) for a in living) / len(living) if living else 0.0
+        trips, hits, conf = self.trip_totals()
+        if trips == 0:
+            return f"memory: avg {avg_beliefs:.1f} beliefs held, no trips to remembered spots yet"
+        return (
+            f"memory: avg {avg_beliefs:.1f} beliefs held | trips to remembered spots {trips}, "
+            f"food really there {100 * hits / trips:.0f}%, avg confidence at departure {conf / trips:.2f}"
+        )
+
     def summary(self) -> str:
         living = self.living_agents()
         if not living:
@@ -126,5 +156,6 @@ class Simulation:
             f"births {self.births}, max gen {max_gen}, "
             f"avg energy {avg_energy:.1f}, avg age {avg_age:.1f}d | "
             f"traits met {met:.3f} spd {spd:.3f} maxE {mxe:.3f}"
+            + f"\n    {self.memory_summary()}"
             + (f"\n    {self.magic.summary()}" if self.magic is not None else "")
         )

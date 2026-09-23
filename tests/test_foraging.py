@@ -28,7 +28,9 @@ def barren_world(size: int = 20) -> World:
 
 def hungry_agent(x: int, y: int) -> Agent:
     genome = Genome(metabolism=1.0, speed=1.0, max_energy=1.0)
-    return Agent(genome=genome, sex=Sex.FEMALE, x=x, y=y, energy=30.0)
+    agent = Agent(genome=genome, sex=Sex.FEMALE, x=x, y=y, energy=30.0)
+    agent.PERCEPTION_NOISE = 0.0  # these tests check the choice rule, not perception
+    return agent
 
 
 class FoodScoreTests(unittest.TestCase):

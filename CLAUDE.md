@@ -24,7 +24,7 @@ re-litigating metaphysics instead of writing code -- that is exactly what
 happened in an earlier attempt (with a different AI) that produced 600+
 lines of doctrine and zero working code.
 
-## Actual status: Slices 1 (reproduction) and 2 (magic accounting) implemented and run
+## Actual status: Slices 1-3 (reproduction, magic accounting, memory) implemented and run
 
 ```
 cd src && python -m genaris.main
@@ -88,12 +88,45 @@ richest/poorest free-energy ratio ~27-31x. The first tuning (diffusion
 prevented -- free energy rises forever, so stores eventually fill and the
 *ratio* between regions drifts toward 1 (the absolute gap stabilizes).
 
+**Memory & perception (Slice 3), `memory.py`:** each agent holds up to 8
+food beliefs (cell, perceived amount, when, encoding strength, source =
+"observed"). Confidence halves per simulated day; eating encodes twice as
+strongly as seeing; weakest beliefs are dropped when full. Beliefs form
+only while the agent attends to food (hungry and looking, or eating --
+Section 18 attention), from the same 4-cell `SIGHT_RADIUS` as live sight:
+memory adds recall, not range. When nothing is in sight, the agent walks
+to its best remembered spot, scored by the same `food_score` with the
+belief's confidence. Spots seen empty are remembered as empty. Perception
+has 15% multiplicative noise (`PERCEPTION_NOISE`), uncoupled from
+distance; eating uses the true amount. Newborns start with no memories.
+Deliberately cut: contradictory memories of one place (a fresh sighting
+overwrites -- a simplification, not the architecture; Slice 4 reports
+will need observation and report to coexist), episodic memory, memories
+of individuals, skills, inference about regrowth. `Agent.MEMORY_ENABLED`
+and `PERCEPTION_NOISE = 0` together reproduce pre-Slice-3 behavior
+exactly (verified byte-for-byte on the default seed).
+
+Observed (8 seeds x 200 days, on fixed foraging): memory has **no
+measurable effect** -- mean population 384 (noise only) vs 380 (noise +
+memory), within seed spread; only 0-12 recall trips per run. Cause is
+ecological, not memory: grass regrows from empty to "food present" in
+3.3 minutes, so every grass cell shows food essentially always (measured
+100% of cells; 0 of 35,261 hungry looks found nothing in sight) and
+recall never triggers. Memory is built and verified but dormant until
+food is patchy in space or time. On the few trips taken, agents departed
+at confidence ~1.00 but found food only ~0-50% of the time -- the
+confidence/accuracy gap Section 18 predicts. Perception noise also
+consistently strengthens selection on metabolism (final mean ~0.86 vs
+~0.91 without noise, lower in all 8 seeds).
+
 Code layout:
 - `src/genaris/genome.py` -- heritable traits, inheritance + mutation
 - `src/genaris/world.py` -- grid, terrain, food regrowth
 - `src/genaris/foraging.py` -- `food_score`, the one rule for valuing a food spot
 - `tests/test_foraging.py` -- food-choice tests
 - `src/genaris/magic.py` -- magic field, terrain storage, ledger
+- `src/genaris/memory.py` -- food beliefs, confidence decay, forgetting
+- `tests/test_memory.py` -- memory/perception/wrong-belief tests
 - `tests/test_magic.py` -- ledger/pathway tests
 - `src/genaris/agent.py` -- one inhabitant's needs/behavior/reproduction/death,
   plus the `LifeHistory` profile
@@ -110,8 +143,8 @@ next one starts:
 - **Slice 2 (implemented):** a minimal magic-energy field -- just the accounting (regional
   generation, storage, leakage per doctrine Sections 3/5/6). No techniques,
   no resonance yet.
-- **Slice 3:** memory & beliefs (doctrine Sections 18/19) -- agents start
-  remembering things and can be wrong.
+- **Slice 3 (implemented; memory dormant in current ecology):** memory &
+  beliefs (doctrine Sections 18/19) -- agents remember and can be wrong.
 - **Slice 4:** simple signaling -> early language (Section 20).
 - Later, in rough order: settlements/culture, the historical archive
   (Section 26), a real visualization, magic techniques/resonance (Sections

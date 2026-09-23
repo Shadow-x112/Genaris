@@ -43,10 +43,11 @@ python -m unittest discover -s tests
 - `src/genaris/world.py` -- the grid, terrain, food regrowth
 - `src/genaris/foraging.py` -- how agents value a food spot (amount vs. distance)
 - `src/genaris/magic.py` -- magical-energy field, terrain storage, ledger
+- `src/genaris/memory.py` -- agents' remembered food spots and confidence
 - `src/genaris/agent.py` -- a single inhabitant's needs/behavior/reproduction/death
 - `src/genaris/simulation.py` -- the tick loop and event log
 - `src/genaris/main.py` -- entry point / demo runner
-- `tests/` -- magic ledger and foraging tests
+- `tests/` -- magic ledger, foraging, and memory tests
 - `docs/` -- the full world-law doctrine and concept brief (reference
   material for later slices, not a checklist to implement all at once)
 
@@ -58,6 +59,9 @@ python -m unittest discover -s tests
 - **Slice 2:** magical-energy accounting -- regional generation, spreading,
   storage in terrain, and a ledger that must always balance. Nothing uses
   magic yet.
+- **Slice 3:** agents remember where they found food, with fading
+  confidence and noisy perception, and can be wrong. Currently has no
+  measurable effect: food regrows too fast for recall to ever be needed.
 
-Next is Slice 3 (memory and beliefs). No visualization yet. See `CLAUDE.md`
+Next is Slice 4 (signaling). No visualization yet. See `CLAUDE.md`
 for the phased roadmap.
