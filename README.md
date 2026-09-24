@@ -23,7 +23,7 @@ python -m genaris.main
 ```
 
 This runs 15 founding agents on a 30x30 grid for 200 simulated days
-(about five minutes). Every 5 days it prints a population summary
+(about three minutes). Every 5 days it prints a population summary
 (sexes, births, generations, average heritable traits) and a magic-field
 ledger line, plus every birth and death since the last summary.
 
@@ -60,8 +60,9 @@ python -m unittest discover -s tests
   storage in terrain, and a ledger that must always balance. Nothing uses
   magic yet.
 - **Slice 3:** agents remember where they found food, with fading
-  confidence and noisy perception, and can be wrong. Currently has no
-  measurable effect: food regrows too fast for recall to ever be needed.
+  confidence and noisy perception, and can be wrong. Agents use it often
+  (recall trips find food ~60% of the time) but it has no measurable
+  effect on population yet.
 
 Next is Slice 4 (signaling). No visualization yet. See `CLAUDE.md`
 for the phased roadmap.

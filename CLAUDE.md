@@ -98,18 +98,19 @@ of individuals, skills, inference about regrowth. `Agent.MEMORY_ENABLED`
 and `PERCEPTION_NOISE = 0` together reproduce pre-Slice-3 behavior
 exactly (verified byte-for-byte on the default seed).
 
-Observed (8 seeds x 200 days, on fixed foraging): memory has **no
-measurable effect** -- mean population 384 (noise only) vs 380 (noise +
-memory), within seed spread; only 0-12 recall trips per run. Cause is
-ecological, not memory: grass regrows from empty to "food present" in
-3.3 minutes, so every grass cell shows food essentially always (measured
-100% of cells; 0 of 35,261 hungry looks found nothing in sight) and
-recall never triggers. Memory is built and verified but dormant until
-food is patchy in space or time. On the few trips taken, agents departed
-at confidence ~1.00 but found food only ~0-50% of the time -- the
-confidence/accuracy gap Section 18 predicts. Perception noise also
-consistently strengthens selection on metabolism (final mean ~0.86 vs
-~0.91 without noise, lower in all 8 seeds).
+Observed, and the ablation baseline carried into Slice 4 (16 seeds x
+200 days, regrow 0.01, eat-until-full): memory is **used but has no
+measurable population effect**. Mean population 28.0 (noise only) vs
+27.8 (noise + memory); per-seed differences span -3.8 to +2.6, mean
+-0.2. Agents make ~970-1,640 recall trips per run and find food on only
+57-63% of them -- wasted trips may offset the useful ones (untested).
+Agents depart at confidence ~1.00 on every seed yet are right ~60% of
+the time: the confidence/accuracy gap Section 18 predicts, now measured
+over ~20,000 trips. Perception noise alone raises population in all 16
+seeds (28.0 vs 24.0 with no noise, no memory); the cause is not yet
+established (one hypothesis: exact scoring herds neighbors onto the same
+best cell and noise spreads them out). History: on the earlier fast
+regrowth (0.15) memory never triggered at all (0-12 trips per run).
 
 Code layout:
 - `src/genaris/genome.py` -- heritable traits, inheritance + mutation
@@ -135,7 +136,7 @@ next one starts:
 - **Slice 2 (implemented):** a minimal magic-energy field -- just the accounting (regional
   generation, storage, leakage per doctrine Sections 3/5/6). No techniques,
   no resonance yet.
-- **Slice 3 (implemented; memory dormant in current ecology):** memory &
+- **Slice 3 (implemented; memory used, no measurable population effect yet):** memory &
   beliefs (doctrine Sections 18/19) -- agents remember and can be wrong.
 - **Slice 4:** simple signaling -> early language (Section 20).
 - Later, in rough order: settlements/culture, the historical archive
