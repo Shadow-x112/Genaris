@@ -29,10 +29,51 @@ class FoodBelief:
     strength: float  # encoding strength at observation (eating encodes more strongly than seeing)
     source: str = "observed"  # only direct observation exists until Slice 4
 
-    def confidence(self, now: int, half_life_ticks: int) -> float:
-        """Confidence decays with disuse. It is the agent's certainty, and is
-        tracked separately from whether the belief is accurate (Section 18)."""
+    def retention(self, now: int, half_life_ticks: int) -> float:
+        """How strongly the belief is still held -- governs forgetting only.
+        Not a probability and not confidence (see ValidityModel)."""
         return self.strength * 0.5 ** ((now - self.observed_tick) / half_life_ticks)
+
+
+class ValidityModel:
+    """The agent's learned sense of how long a food memory stays true.
+
+    Each time a remembered food spot comes back into view after a gap, the
+    agent records the belief's age and whether food was still there.
+    Confidence in a belief of age t is the agent's own smoothed hit rate
+    for that age range: (hits + 1) / (tries + 2), a probability in (0, 1).
+    With no experience it is 0.5 -- "I don't know yet". Learned in one
+    lifetime, not inherited (Section 14); lifetime-learned expectation
+    (Section 35). It tracks the ecology rather than a hand-set decay rate,
+    so it stays calibrated if regrowth or crowding change.
+    """
+
+    # lower edges of age bins, in ticks (roughly log-spaced)
+    AGE_BINS = (0, 5, 10, 25, 50, 100, 200, 400, 800)
+    # a belief refreshed on the previous tick (continuous view while
+    # feeding) is trivially still right; only a return after a gap is a test
+    MIN_TEST_AGE = 2
+
+    def __init__(self) -> None:
+        self.hits = [0] * len(self.AGE_BINS)
+        self.tries = [0] * len(self.AGE_BINS)
+
+    def _bin(self, age: int) -> int:
+        i = 0
+        while i + 1 < len(self.AGE_BINS) and age >= self.AGE_BINS[i + 1]:
+            i += 1
+        return i
+
+    def record(self, age: int, still_there: bool) -> None:
+        if age < self.MIN_TEST_AGE:
+            return
+        i = self._bin(age)
+        self.tries[i] += 1
+        self.hits[i] += still_there
+
+    def probability(self, age: int) -> float:
+        i = self._bin(age)
+        return (self.hits[i] + 1) / (self.tries[i] + 2)
 
 
 class FoodMemory:
@@ -44,12 +85,29 @@ class FoodMemory:
         self.capacity = capacity
         self.half_life_ticks = half_life_ticks
         self.beliefs: dict[tuple[int, int], FoodBelief] = {}
+        self.validity = ValidityModel()
 
     def __len__(self) -> int:
         return len(self.beliefs)
 
+    def retention(self, belief: FoodBelief, now: int) -> float:
+        return belief.retention(now, self.half_life_ticks)
+
     def confidence(self, belief: FoodBelief, now: int) -> float:
-        return belief.confidence(now, self.half_life_ticks)
+        """Probability, as the agent has learned it, that a food belief
+        this old is still true. Kept separate from retention: a strongly
+        held memory (e.g. somewhere it ate) is not thereby more likely to
+        be current."""
+        return self.validity.probability(now - belief.observed_tick)
+
+    def check_against_sight(self, x: int, y: int, radius: int, seen_cells: set[tuple[int, int]], now: int,
+                            min_amount: float) -> None:
+        """Before fresh sightings overwrite them: every remembered food spot
+        now in view is a test of the memory -- learn from whether food is
+        still seen there. Call before observe() for this look."""
+        for b in self.beliefs_within(x, y, radius):
+            if b.amount > min_amount:
+                self.validity.record(now - b.observed_tick, (b.x, b.y) in seen_cells)
 
     def observe(self, x: int, y: int, perceived: float, now: int, strength: float) -> None:
         """Record a direct observation. A fresh sighting replaces any older
@@ -60,10 +118,10 @@ class FoodMemory:
         """Drop beliefs that decayed away, then the weakest ones if over
         capacity (interference / limited storage). Ties break by cell
         coordinates so the result doesn't depend on dict order."""
-        for key in [k for k, b in self.beliefs.items() if self.confidence(b, now) < self.FORGET_BELOW]:
+        for key in [k for k, b in self.beliefs.items() if self.retention(b, now) < self.FORGET_BELOW]:
             del self.beliefs[key]
         while len(self.beliefs) > self.capacity:
-            weakest = min(self.beliefs.values(), key=lambda b: (self.confidence(b, now), b.x, b.y))
+            weakest = min(self.beliefs.values(), key=lambda b: (self.retention(b, now), b.x, b.y))
             del self.beliefs[(weakest.x, weakest.y)]
 
     def beliefs_within(self, x: int, y: int, radius: int) -> list[FoodBelief]:

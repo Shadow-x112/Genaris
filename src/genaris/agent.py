@@ -237,6 +237,8 @@ class Agent:
                 self.trip_target = None
 
         seen_cells = {(x, y) for x, y, _ in seen}
+        # remembered food spots back in view test the memory: learn from them
+        self.memory.check_against_sight(self.x, self.y, self.SIGHT_RADIUS, seen_cells, now, self.FOOD_PRESENT)
         for x, y, amount in seen:
             self.memory.observe(x, y, amount, now, FoodMemory.SEEN_STRENGTH)
         # remembered spots now in view with no food seen: remembered as empty
