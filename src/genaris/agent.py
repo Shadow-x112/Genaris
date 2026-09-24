@@ -76,6 +76,7 @@ class Agent:
     generation: int = 0  # 0 = founder (initialization, not simulated birth)
     parent_ids: tuple[int, int] | None = None
     repro_cooldown: int = 0  # ticks until this agent may reproduce again
+    feeding: bool = False  # in a meal: keeps eating until satiated, not just until un-hungry
     # spatial food memory; newborns start empty, nothing is inherited (Section 14)
     memory: FoodMemory = field(default_factory=FoodMemory)
     trip_target: tuple[int, int] | None = None  # remembered spot currently being walked to
@@ -95,9 +96,16 @@ class Agent:
     MATE_RADIUS = 4  # how far an agent can "see" a potential mate
     STARVE_THRESHOLD = 0.0
     LIFE = DEV_COMPRESSED
-    MEMORY_ENABLED = True  # off = Slice 2 foraging (for ablation runs)
+    MEMORY_ENABLED = True  # off = no recall or belief formation (for ablation runs)
     PERCEPTION_NOISE = 0.15  # std-dev of multiplicative error on perceived food amounts; 0 = exact
     FOOD_PRESENT = 0.5  # food amount an agent treats as "there's food here"
+    # Hunger has hysteresis: a meal starts when the energy deficit passes
+    # SEARCH_HUNGER_RATIO and continues (one bite per tick) until energy
+    # reaches SATIATION_ENERGY_RATIO of max. Before this, agents stopped the
+    # moment they were no longer hungry -- a one-bite "meal" -- so no visit
+    # could ever deplete a cell.
+    SEARCH_HUNGER_RATIO = 0.35  # energy deficit (fraction of max) that starts a meal
+    SATIATION_ENERGY_RATIO = 0.95  # energy (fraction of max) that ends it
 
     @property
     def max_energy(self) -> float:
@@ -130,8 +138,11 @@ class Agent:
 
         # --- decide and act ---
         cell = world.cell(self.x, self.y)
-        hunger_ratio = 1.0 - (self.energy / self.max_energy)
-        is_hungry = hunger_ratio > 0.35
+        if not self.feeding and 1.0 - self.energy / self.max_energy > self.SEARCH_HUNGER_RATIO:
+            self.feeding = True
+        elif self.feeding and self.energy >= self.SATIATION_ENERGY_RATIO * self.max_energy:
+            self.feeding = False
+        is_hungry = self.feeding
 
         moved = False
         if is_hungry:

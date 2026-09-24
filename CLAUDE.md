@@ -53,7 +53,11 @@ choice yet -- intentionally.
 **Foraging:** a hungry agent picks the visible food cell (including its
 own) with the best `food_score(amount, distance)` in `foraging.py` --
 amount / (1 + distance), no minimum cutoff, so crumbs are still eaten when
-nothing better is in range. Until this fix (found via the Slice 3
+nothing better is in range. Hunger has hysteresis: a meal starts at a 35%
+energy deficit (`SEARCH_HUNGER_RATIO`) and continues one bite per tick
+until 95% of max (`SATIATION_ENERGY_RATIO`), ~9 food per meal every ~48
+ticks. Before that, a "meal" was one bite (agents stopped the moment they
+were no longer hungry), so no visit could ever empty a cell. Until this fix (found via the Slice 3
 ablation) agents walked to the *nearest* cell with any food and spent
 ticks on tiny bites, which capped every Slice 0-2 population number at
 roughly a third of what the food supply supports.
