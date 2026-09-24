@@ -62,35 +62,23 @@ ablation) agents walked to the *nearest* cell with any food and spent
 ticks on tiny bites, which capped every Slice 0-2 population number at
 roughly a third of what the food supply supports.
 
-Observed with fixed foraging (200-day runs, 8 seeds, ~5 min each):
-population plateaus at roughly 290-450 depending on seed (was 50-155
-before the fix); never extinct, never unbounded. Generation 12-13;
-starvation is still the main death cause. Across all 8 seeds mean
-metabolism falls (~1.0 -> 0.89-0.93) and mean speed rises (+0.01 to
-+0.07). Mean max_energy rises in 6 seeds, is flat in 1, and dips slightly
-in 1 -- a weaker signal than before the fix, plausibly because efficient
-foraging makes large reserves matter less.
+**Food regrowth:** `regrow_rate = 0.01` per tick, so an emptied cell is
+visible again (> 0.5 food) after 50 ticks -- set just above the measured
+~48-tick gap between meals. Flat regrowth makes this rate both the
+recovery delay *and* the total food supply; they can't be tuned apart.
+At the original 0.15, cells refilled in 3.3 ticks and never looked empty.
+Now ~44% of grass cells sit below 1.0 food and ~3% of hungry looks find
+nothing in sight (was 0%).
 
-**Magic (Slice 2), `magic.py`:** free energy per grid cell, generated at
-fixed regional rates (baseline + 3 seeded hotspots), spreading between
-neighbors (closed world edges), absorbed into terrain matter up to a
-per-terrain capacity and leaking back. Terrain-only storage -- agents do
-not hold or sense magic, and it has no effect on anything yet. The field
-starts at zero. A ledger enforces `free + bound == initial + generated`
-after every update and raises `MagicAccountingError` rather than clamping.
-No sinks exist, so the total grows linearly forever -- doctrine-correct
-for this slice, not a bug. Strain (Section 6) is deferred: there is no
-magical activity to cause it. Magic uses its own seeded stream
-(`"magic:{seed}"`), so agent outcomes per seed are unchanged by it.
-
-Tuning (current `MagicConfig` placeholders): slow diffusion (0.0002) and
-large terrain stores (grass 500 / empty 150) so regions stay distinct and
-stores fill over months. Observed at day 200 (2 seeds): stores ~66% full,
-richest/poorest free-energy ratio ~27-31x. The first tuning (diffusion
-0.005, stores 50/15) saturated stores by day 25 and flattened the map to
-~1.2x. Note: with no sinks, both effects are only delayed, never
-prevented -- free energy rises forever, so stores eventually fill and the
-*ratio* between regions drifts toward 1 (the absolute gap stabilizes).
+Observed (200-day runs, 8 seeds, regrow 0.01): population plateaus at
+~18-39 (roughly 25 on average) -- small, so extinction risk over longer
+runs is real, though none of 8 seeds went extinct in 200 days.
+Generation 10-12; starvation is still the main death cause. Mean
+metabolism falls strongly in all 8 seeds (~1.0 -> 0.75-0.82, the
+strongest selection so far). Speed rises in 6 seeds and is flat or down
+in 2; max_energy is mixed (up in 5, down in 3). History: 50-155 with
+the original nearest-crumb forager, ~290-450 after the foraging fix with
+one-bite meals and fast regrowth.
 
 **Memory & perception (Slice 3), `memory.py`:** each agent holds up to 8
 food beliefs (cell, perceived amount, when, encoding strength, source =
