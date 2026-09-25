@@ -21,7 +21,13 @@ class Cell:
     terrain: Terrain
     food: float  # 0..max_food. Only meaningful for GRASS cells.
     max_food: float = 10.0
-    regrow_rate: float = 0.15  # food regrown per tick while below max
+    # Food regrown per tick while below max. Empty -> visible (> 0.5 food)
+    # takes 0.5 / regrow_rate ticks: 50 here, just above the measured
+    # ~48-tick gap between an agent's meals, so "has this spot recovered
+    # since I last saw it?" is a real question. At the original 0.15 an
+    # emptied cell was visible again in 3.3 ticks and never looked empty.
+    # This is also the total food supply per grass cell: one knob, two roles.
+    regrow_rate: float = 0.01
 
 
 class World:

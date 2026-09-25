@@ -81,5 +81,44 @@ class ForagingChoiceTests(unittest.TestCase):
         self.assertAlmostEqual(world.cell(5, 5).food, 6.0)
 
 
+class MealTests(unittest.TestCase):
+    """Hunger hysteresis: a meal runs from 'hungry' to 'satiated'."""
+
+    def test_keeps_eating_past_unhungry_until_satiated(self) -> None:
+        world = barren_world()
+        world.cell(5, 5).food = 10.0
+        agent = hungry_agent(5, 5)
+        agent.energy = 60.0  # deficit 0.40 > 0.35: meal starts
+        rng = random.Random(1)
+        agent.tick(world, rng)  # bite 3 -> ~71: no longer hungry, but still in the meal
+        self.assertTrue(agent.feeding)
+        agent.tick(world, rng)  # bite 3 -> ~83
+        agent.tick(world, rng)  # bite 3 -> ~94, still below 95
+        self.assertTrue(agent.feeding)
+        agent.tick(world, rng)  # last 1.0 food -> ~98
+        self.assertAlmostEqual(world.cell(5, 5).food, 0.0)  # one visit emptied the cell
+        agent.tick(world, rng)
+        self.assertFalse(agent.feeding)  # satiated: meal over
+
+    def test_meal_ends_at_satiation(self) -> None:
+        world = barren_world()
+        world.cell(5, 5).food = 10.0
+        agent = hungry_agent(5, 5)
+        agent.feeding = True
+        agent.energy = 96.0  # already at/above 95% of max 100
+        agent.tick(world, random.Random(1))
+        self.assertFalse(agent.feeding)
+        self.assertAlmostEqual(world.cell(5, 5).food, 10.0)  # didn't eat
+
+    def test_no_meal_until_search_threshold(self) -> None:
+        world = barren_world()
+        world.cell(5, 5).food = 10.0
+        agent = hungry_agent(5, 5)
+        agent.energy = 70.0  # deficit 0.30 < 0.35: not hungry, not in a meal
+        agent.tick(world, random.Random(1))
+        self.assertFalse(agent.feeding)
+        self.assertAlmostEqual(world.cell(5, 5).food, 10.0)
+
+
 if __name__ == "__main__":
     unittest.main()

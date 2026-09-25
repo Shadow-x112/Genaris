@@ -53,45 +53,62 @@ choice yet -- intentionally.
 **Foraging:** a hungry agent picks the visible food cell (including its
 own) with the best `food_score(amount, distance)` in `foraging.py` --
 amount / (1 + distance), no minimum cutoff, so crumbs are still eaten when
-nothing better is in range. Until this fix (found via the Slice 3
-ablation) agents walked to the *nearest* cell with any food and spent
-ticks on tiny bites, which capped every Slice 0-2 population number at
-roughly a third of what the food supply supports.
+nothing better is in range. Hunger has hysteresis: a meal starts at a 35%
+energy deficit (`SEARCH_HUNGER_RATIO`) and continues one bite per tick
+until 95% of max (`SATIATION_ENERGY_RATIO`), ~9 food per meal every ~48
+ticks. Before that, a "meal" was one bite (agents stopped the moment they
+were no longer hungry), so no visit could ever empty a cell. Before the
+`food_score` fix (found via the Slice 3 ablation), agents walked to the
+*nearest* cell with any food and spent ticks on tiny bites, which capped
+every Slice 0-2 population number at roughly a third of what the food
+supply supported.
 
-Observed with fixed foraging (200-day runs, 8 seeds, ~5 min each):
-population plateaus at roughly 290-450 depending on seed (was 50-155
-before the fix); never extinct, never unbounded. Generation 12-13;
-starvation is still the main death cause. Across all 8 seeds mean
-metabolism falls (~1.0 -> 0.89-0.93) and mean speed rises (+0.01 to
-+0.07). Mean max_energy rises in 6 seeds, is flat in 1, and dips slightly
-in 1 -- a weaker signal than before the fix, plausibly because efficient
-foraging makes large reserves matter less.
+**Food regrowth:** `regrow_rate = 0.01` per tick, so an emptied cell is
+visible again (> 0.5 food) after 50 ticks -- set just above the measured
+~48-tick gap between meals. Flat regrowth makes this rate both the
+recovery delay *and* the total food supply; they can't be tuned apart.
+At the original 0.15, cells refilled in 3.3 ticks and never looked empty.
+Now ~44% of grass cells sit below 1.0 food and ~3% of hungry looks find
+nothing in sight (was 0%).
 
-**Magic (Slice 2), `magic.py`:** free energy per grid cell, generated at
-fixed regional rates (baseline + 3 seeded hotspots), spreading between
-neighbors (closed world edges), absorbed into terrain matter up to a
-per-terrain capacity and leaking back. Terrain-only storage -- agents do
-not hold or sense magic, and it has no effect on anything yet. The field
-starts at zero. A ledger enforces `free + bound == initial + generated`
-after every update and raises `MagicAccountingError` rather than clamping.
-No sinks exist, so the total grows linearly forever -- doctrine-correct
-for this slice, not a bug. Strain (Section 6) is deferred: there is no
-magical activity to cause it. Magic uses its own seeded stream
-(`"magic:{seed}"`), so agent outcomes per seed are unchanged by it.
+*Known limitation, undecided:* because of that coupling, the ~25-agent
+population was observed, not designed. Candidate second knobs if this
+becomes load-bearing: world size (more cells = more supply at the same
+recovery delay -- the cleanest decoupling), `grass_fraction` (same idea,
+but capped at ~1.8x the current supply), or a non-flat regrowth law.
+`max_food` does *not* decouple them: it sets how rich a full cell is, not
+how fast an empty one becomes visible or how much food flows per tick.
 
-Tuning (current `MagicConfig` placeholders): slow diffusion (0.0002) and
-large terrain stores (grass 500 / empty 150) so regions stay distinct and
-stores fill over months. Observed at day 200 (2 seeds): stores ~66% full,
-richest/poorest free-energy ratio ~27-31x. The first tuning (diffusion
-0.005, stores 50/15) saturated stores by day 25 and flattened the map to
-~1.2x. Note: with no sinks, both effects are only delayed, never
-prevented -- free energy rises forever, so stores eventually fill and the
-*ratio* between regions drifts toward 1 (the absolute gap stabilizes).
+Observed (200-day runs, 8 seeds, regrow 0.01): population plateaus at
+~18-39 (roughly 25 on average) -- small, so extinction risk over longer
+runs is real, though none of 8 seeds went extinct in 200 days.
+Generation 10-12; starvation is still the main death cause.
+
+Selection vs drift at this small N -- neutral-trait control (16 seeds x
+200 days, a heritable value with no fitness effect, inherited by the same
+rule as real traits, run in the same simulations): the neutral trait's
+mean moves |0.040| on average in a random direction (down in 10/16).
+Metabolism moves -0.169 on average, down in 16/16 -- ~4x drift and fully
+consistent in direction: selection, not drift. Speed (+0.054, up 14/16)
+and max_energy (+0.055, up 13/16) exceed drift less clearly: probably
+weak selection. The control script lives outside the repo; rerun it
+before claiming selection on any trait at a new population size.
+History: 50-155 with
+the original nearest-crumb forager, ~290-450 after the foraging fix with
+one-bite meals and fast regrowth.
 
 **Memory & perception (Slice 3), `memory.py`:** each agent holds up to 8
 food beliefs (cell, perceived amount, when, encoding strength, source =
-"observed"). Confidence halves per simulated day; eating encodes twice as
-strongly as seeing; weakest beliefs are dropped when full. Beliefs form
+"observed"). *Retention* halves per simulated day and governs forgetting
+only; eating encodes twice as strongly as seeing; the least-retained
+beliefs are dropped when full. *Confidence* is separate: a probability
+each agent learns from its own experience (`ValidityModel`) -- whenever a
+remembered food spot comes back into view after a gap, it records the
+belief's age and whether food was still there; confidence for age t is
+its smoothed hit rate for that age range, (hits+1)/(tries+2), starting at
+0.5 for a newborn. Not inherited. (Originally confidence *was* retention
+-- up to 2.0 and decaying over a day while the world changes in ~50
+ticks -- so agents departed at ~1.00 and were right ~60%: a bug, fixed.) Beliefs form
 only while the agent attends to food (hungry and looking, or eating --
 Section 18 attention), from the same 4-cell `SIGHT_RADIUS` as live sight:
 memory adds recall, not range. When nothing is in sight, the agent walks
@@ -106,18 +123,31 @@ of individuals, skills, inference about regrowth. `Agent.MEMORY_ENABLED`
 and `PERCEPTION_NOISE = 0` together reproduce pre-Slice-3 behavior
 exactly (verified byte-for-byte on the default seed).
 
-Observed (8 seeds x 200 days, on fixed foraging): memory has **no
-measurable effect** -- mean population 384 (noise only) vs 380 (noise +
-memory), within seed spread; only 0-12 recall trips per run. Cause is
-ecological, not memory: grass regrows from empty to "food present" in
-3.3 minutes, so every grass cell shows food essentially always (measured
-100% of cells; 0 of 35,261 hungry looks found nothing in sight) and
-recall never triggers. Memory is built and verified but dormant until
-food is patchy in space or time. On the few trips taken, agents departed
-at confidence ~1.00 but found food only ~0-50% of the time -- the
-confidence/accuracy gap Section 18 predicts. Perception noise also
-consistently strengthens selection on metabolism (final mean ~0.86 vs
-~0.91 without noise, lower in all 8 seeds).
+Observed, and the ablation baseline carried into Slice 4 (16 seeds x
+200 days, regrow 0.01, eat-until-full): memory is **used but has no
+measurable population effect**. Mean population 28.0 (noise only) vs
+27.8 (noise + memory), and 27.5 with learned confidence; per-seed
+differences span -3.8 to +2.6. Agents make ~900-1,650 recall trips per
+run and find food on ~56-65% of them. **Why memory doesn't help is an
+open question, not a settled fact** -- one untested idea is that wasted
+trips offset useful ones. Don't build on "memory doesn't matter".
+
+Calibration after the fix (20,533 trips): mean stated confidence 0.653
+vs actual hit rate 0.606 -- calibrated *on average* (the gap was 0.35).
+**Not calibrated by band**: actual hit rate stays ~0.53-0.64 whatever
+the stated confidence, so confidence barely discriminates good memories
+from bad, and the 0.9-1.0 band (3% of trips) is badly overconfident
+(stated 0.93, actual 0.28). Untested hypothesis: agents learn from
+memories re-checked while foraging nearby, but use confidence only on
+trips, which start when nothing is in sight -- usually a stripped area,
+where even a fresh memory is likely already eaten. Age alone can't see
+that. Resolve before Slice 4 signals confidence between agents.
+
+Perception noise alone raises population in all 16
+seeds (28.0 vs 24.0 with no noise, no memory); the cause is not yet
+established (one hypothesis: exact scoring herds neighbors onto the same
+best cell and noise spreads them out). History: on the earlier fast
+regrowth (0.15) memory never triggered at all (0-12 trips per run).
 
 Code layout:
 - `src/genaris/genome.py` -- heritable traits, inheritance + mutation
@@ -125,13 +155,32 @@ Code layout:
 - `src/genaris/foraging.py` -- `food_score`, the one rule for valuing a food spot
 - `tests/test_foraging.py` -- food-choice tests
 - `src/genaris/magic.py` -- magic field, terrain storage, ledger
-- `src/genaris/memory.py` -- food beliefs, confidence decay, forgetting
+- `src/genaris/memory.py` -- food beliefs, retention/forgetting, learned confidence
 - `tests/test_memory.py` -- memory/perception/wrong-belief tests
 - `tests/test_magic.py` -- ledger/pathway tests
 - `src/genaris/agent.py` -- one inhabitant's needs/behavior/reproduction/death,
   plus the `LifeHistory` profile
 - `src/genaris/simulation.py` -- tick loop + event log
 - `src/genaris/main.py` -- entry point / demo runner
+
+**Runtime:** a default 200-day run takes ~2.5 min at N~25. The cause is
+unprofiled (a guess: feeding agents scan every tick). Profile before
+optimizing if it grows.
+
+## Open decision for the person: what kind of world is this?
+
+A separate, unmerged copy of this repo (another session, branched from
+before the foraging fix) went the other way on food: faster regrowth,
+a population of ~150-240. That's a real fork, not a tuning difference:
+
+- **Small / scarce** (this repo, ~25): real depletion, memory gets used,
+  drift is a live confound, extinction risk on long runs.
+- **Large / abundant** (~150-450 depending on regrowth): starvation-
+  dominated but little local depletion, so memory rarely matters; less
+  drift. Note that copy's numbers came from the pre-fix forager.
+
+Not to be picked quietly by default. World size (see food regrowth
+above) could give a large population *with* real depletion.
 
 ## The phased roadmap (do not skip ahead)
 
@@ -143,7 +192,7 @@ next one starts:
 - **Slice 2 (implemented):** a minimal magic-energy field -- just the accounting (regional
   generation, storage, leakage per doctrine Sections 3/5/6). No techniques,
   no resonance yet.
-- **Slice 3 (implemented; memory dormant in current ecology):** memory &
+- **Slice 3 (implemented; memory used, no measurable population effect yet):** memory &
   beliefs (doctrine Sections 18/19) -- agents remember and can be wrong.
 - **Slice 4:** simple signaling -> early language (Section 20).
 - Later, in rough order: settlements/culture, the historical archive

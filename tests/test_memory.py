@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from genaris.agent import Agent, Sex  # noqa: E402
 from genaris.genome import Genome  # noqa: E402
-from genaris.memory import FoodMemory  # noqa: E402
+from genaris.memory import FoodMemory, ValidityModel  # noqa: E402
 from genaris.world import Cell, Terrain, World  # noqa: E402
 
 DAY = 24 * 60
@@ -34,13 +34,20 @@ def hungry_agent(x: int, y: int) -> Agent:
 
 
 class FoodMemoryTests(unittest.TestCase):
-    def test_confidence_halves_each_half_life(self) -> None:
+    def test_retention_halves_each_half_life(self) -> None:
         m = FoodMemory(half_life_ticks=DAY)
         m.observe(1, 1, 5.0, now=0, strength=1.0)
         b = m.beliefs[(1, 1)]
-        self.assertAlmostEqual(m.confidence(b, 0), 1.0)
-        self.assertAlmostEqual(m.confidence(b, DAY), 0.5)
-        self.assertAlmostEqual(m.confidence(b, 3 * DAY), 0.125)
+        self.assertAlmostEqual(m.retention(b, 0), 1.0)
+        self.assertAlmostEqual(m.retention(b, DAY), 0.5)
+        self.assertAlmostEqual(m.retention(b, 3 * DAY), 0.125)
+
+    def test_strong_encoding_does_not_raise_confidence(self) -> None:
+        m = FoodMemory()
+        m.observe(1, 1, 5.0, now=0, strength=FoodMemory.ATE_STRENGTH)
+        m.observe(2, 2, 5.0, now=0, strength=FoodMemory.SEEN_STRENGTH)
+        self.assertEqual(m.confidence(m.beliefs[(1, 1)], 30), m.confidence(m.beliefs[(2, 2)], 30))
+        self.assertGreater(m.retention(m.beliefs[(1, 1)], 30), m.retention(m.beliefs[(2, 2)], 30))
 
     def test_faded_beliefs_are_forgotten(self) -> None:
         m = FoodMemory(half_life_ticks=DAY)
@@ -82,6 +89,35 @@ class FoodMemoryTests(unittest.TestCase):
         self.assertEqual((b.x, b.y), (2, 0))
 
 
+class ValidityModelTests(unittest.TestCase):
+    def test_no_experience_means_no_idea(self) -> None:
+        v = ValidityModel()
+        for age in (0, 3, 30, 300, 10_000):
+            self.assertEqual(v.probability(age), 0.5)
+
+    def test_learns_hit_rate_per_age_range(self) -> None:
+        v = ValidityModel()
+        for i in range(98):
+            v.record(3, still_there=True)  # fresh memories: always right
+            v.record(300, still_there=(i % 4 == 0))  # old ones: right 1 time in 4
+        self.assertAlmostEqual(v.probability(3), 99 / 100)
+        self.assertAlmostEqual(v.probability(300), 26 / 100)
+        self.assertEqual(v.probability(30), 0.5)  # an untested age range stays unknown
+
+    def test_continuous_view_is_not_a_test(self) -> None:
+        v = ValidityModel()
+        for _ in range(50):
+            v.record(1, still_there=True)  # refreshed last tick: trivially right
+        self.assertEqual(v.probability(1), 0.5)
+
+    def test_confidence_is_a_probability(self) -> None:
+        v = ValidityModel()
+        for _ in range(10_000):
+            v.record(3, still_there=True)
+        self.assertLess(v.probability(3), 1.0)
+        self.assertGreater(v.probability(3), 0.99)
+
+
 class PerceptionTests(unittest.TestCase):
     def test_no_noise_is_exact(self) -> None:
         a = hungry_agent(0, 0)
@@ -116,11 +152,14 @@ class BeliefCanBeWrongTests(unittest.TestCase):
         self.assertEqual(agent._recall_food(), (3, 3))
         self.assertAlmostEqual(agent.memory.beliefs[(3, 3)].amount, 8.0)
 
-        # on coming back into view the trip counts as a miss, and the belief is corrected
+        # on coming back into view the trip counts as a miss, the belief is
+        # corrected, and the agent learns that memories this old can be wrong
+        agent.age_ticks += 100  # time passed while it was away
         agent.x, agent.y = 6, 6
         agent._look_for_food(world, rng)
         self.assertEqual((agent.trips, agent.trip_hits), (1, 0))
         self.assertEqual(agent.memory.beliefs[(3, 3)].amount, 0.0)
+        self.assertLess(agent.memory.validity.probability(100), 0.5)
 
     def test_trip_to_real_food_counts_as_hit(self) -> None:
         world = barren_world()
